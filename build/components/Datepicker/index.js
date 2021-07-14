@@ -17,6 +17,10 @@ var _core = require("@material-ui/core");
 
 var _styles = require("@material-ui/styles");
 
+var _rendifyHelper = require("./rendifyHelper");
+
+var _moment = _interopRequireDefault(require("moment"));
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { "default": obj }; }
 
 function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = Object.defineProperty && Object.getOwnPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : {}; if (desc.get || desc.set) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } } newObj["default"] = obj; return newObj; } }
@@ -46,8 +50,8 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 var useStyles = (0, _styles.makeStyles)(function (theme) {
   return {
     dialogPaper: _defineProperty({
-      minHeight: 482,
-      maxHeight: 482,
+      minHeight: 600,
+      maxHeight: 600,
       display: 'flex'
     }, theme.breakpoints.down('xs'), {
       margin: "".concat(theme.spacing(1), "px")
@@ -86,7 +90,36 @@ var DatePicker = function DatePicker(_ref) {
       _ref$submitButtonText = _ref.submitButtonText,
       submitButtonText = _ref$submitButtonText === void 0 ? 'Submit' : _ref$submitButtonText,
       _ref$selectedDatesTit = _ref.selectedDatesTitle,
-      selectedDatesTitle = _ref$selectedDatesTit === void 0 ? 'Selected Dates' : _ref$selectedDatesTit;
+      selectedDatesTitle = _ref$selectedDatesTit === void 0 ? 'Selected Dates' : _ref$selectedDatesTit,
+      disabledDatesTitle = _ref.disabledDatesTitle,
+      disableClock = _ref.disableClock,
+      times = _ref.times,
+      halfDisabledDates = _ref.halfDisabledDates,
+      chooseMulti = _ref.chooseMulti,
+      selectedStartTs = _ref.selectedStartTs,
+      selectedEndTs = _ref.selectedEndTs;
+
+  // Tekitame aegadest topelt halduse - Komponenti antakse kasutaja puhke kellaajad
+  // Kui aga valitud päev on halfDisabledDate - siis näitame algus kella hoopis selle järgi
+  var _useState = (0, _react.useState)(times || []),
+      _useState2 = _slicedToArray(_useState, 2),
+      timesInternal = _useState2[0],
+      setTimesInternal = _useState2[1];
+
+  var _useState3 = (0, _react.useState)(''),
+      _useState4 = _slicedToArray(_useState3, 2),
+      noticeTxt = _useState4[0],
+      setNoticeTxt = _useState4[1];
+
+  var _React$useState = _react["default"].useState(null),
+      _React$useState2 = _slicedToArray(_React$useState, 2),
+      outterChosenStartTs = _React$useState2[0],
+      setChosenOuterStartTs = _React$useState2[1];
+
+  var _React$useState3 = _react["default"].useState(null),
+      _React$useState4 = _slicedToArray(_React$useState3, 2),
+      outterChosenEndTs = _React$useState4[0],
+      setChosenOuterEndTs = _React$useState4[1];
 
   if (cancelButtonText == null) {
     cancelButtonText = readOnly ? 'Dismiss' : 'Cancel';
@@ -100,26 +133,73 @@ var DatePicker = function DatePicker(_ref) {
       maxDate = _useReducer2$.maxDate,
       dispatch = _useReducer2[1];
 
-  var classes = useStyles();
+  var classes = useStyles(); // When triggered internally in Calendar
+
+  var setOuterStartEndTs = function setOuterStartEndTs(start, end) {
+    setChosenOuterStartTs(start);
+    setChosenOuterEndTs(end);
+  };
+
   var onSelect = (0, _react.useCallback)(function (day) {
-    if (readOnly) return;
+    if (readOnly) {
+      return;
+    }
+
+    var selectedDatesPayload = [];
 
     if (_utils["default"].dateIn(selectedDates, day)) {
+      selectedDatesPayload = selectedDates.filter(function (date) {
+        return !_utils["default"].isSameDay(date, day);
+      });
       dispatch({
         type: 'setSelectedDates',
-        payload: selectedDates.filter(function (date) {
-          return !_utils["default"].isSameDay(date, day);
-        })
+        payload: selectedDatesPayload
       });
     } else {
+      selectedDatesPayload = [].concat(_toConsumableArray(selectedDates), [day]);
       dispatch({
         type: 'setSelectedDates',
-        payload: [].concat(_toConsumableArray(selectedDates), [day])
+        payload: selectedDatesPayload
       });
+    } // RENDIFY LOGIC BEGIN
+    // On toote kella ajad ning on ka renditud päevad
+
+
+    if (times && halfDisabledDates) {
+      var anyHalfRentDay = halfDisabledDates.find(function (half) {
+        return selectedDatesPayload.find(function (sel) {
+          return _utils["default"].isSameDay(sel, half);
+        });
+      });
+
+      if (anyHalfRentDay) {
+        var startTs, endTs; // for Date.prototype And Moment jS
+
+        try {
+          startTs = (0, _moment["default"])().set('hours', anyHalfRentDay.getHours() + 1); // + 1 on ajabuhver peale renditagastust.
+        } catch (e) {
+          startTs = (0, _moment["default"])().set('hours', anyHalfRentDay.hour() + 1); // + 1 on ajabuhver peale renditagastust.
+        }
+
+        try {
+          endTs = (0, _moment["default"])().set('hours', times[times.length - 1].getHours());
+        } catch (e) {
+          endTs = (0, _moment["default"])().set('hours', times[times.length - 1].hour());
+        } // Arvutame uue alguse kuupäev rendi päeva pealt.
+
+
+        setTimesInternal((0, _rendifyHelper.getListForStartAndEndTs)(startTs, endTs));
+      } else {
+        setTimesInternal(times);
+      }
+    } else {
+      return; // Pole bronnitud päevi ja kuupäevad on juba on init paika pandud.
     }
-  }, [selectedDates, dispatch, readOnly]);
+  }, [selectedDates, dispatch, readOnly, halfDisabledDates, times]);
   var onRemoveAtIndex = (0, _react.useCallback)(function (index) {
-    if (readOnly) return;
+    if (readOnly) {
+      return;
+    }
 
     var newDates = _toConsumableArray(selectedDates);
 
@@ -145,9 +225,85 @@ var DatePicker = function DatePicker(_ref) {
   }, [dismiss]);
   var handleOk = (0, _react.useCallback)(function (e) {
     e.preventDefault();
-    if (readOnly) return;
-    onSubmit(selectedDates);
-  }, [onSubmit, selectedDates, readOnly]);
+
+    if (readOnly) {
+      return;
+    }
+
+    var reset = function reset() {
+      setTimeout(function () {
+        setNoticeTxt('');
+      }, 3000);
+    };
+
+    if (selectedDates.find(function (e) {
+      return (0, _moment["default"])().isAfter((0, _moment["default"])(e));
+    })) {
+      setNoticeTxt("Kuupäev on minevikus.");
+      return reset();
+    }
+    /* validation 1 */
+
+
+    if (chooseMulti && (selectedDates.length === 0 || selectedDates.length === 1)) {
+      setNoticeTxt("Vali alguse- ja lõpukuupäev");
+      return reset();
+    }
+    /* validation 2 */
+
+
+    if (!disableClock && (!outterChosenStartTs || !outterChosenEndTs)) {
+      setNoticeTxt("Vali ka rendi algus ja lõpp kellaajad.");
+      return reset();
+    }
+    /* validation 3 */
+
+
+    if (chooseMulti === false) {
+      if (selectedDates.length > 1) {
+        setNoticeTxt("Vali ainult üks päev");
+        return reset();
+      }
+
+      if ((0, _moment["default"])(outterChosenEndTs).isBefore(outterChosenStartTs)) {
+        setNoticeTxt("Alguse kellaaeg on hiljem kui lõpu.");
+        return reset();
+      }
+    }
+
+    if (!disableClock) {
+      /* validation 4 */
+      var sortedDates = (0, _rendifyHelper.sortDate)(selectedDates); // järjekorda ja vaatame et päevade vahel ei oleks tühjust.
+
+      var triggered = false;
+      sortedDates.forEach(function (sd, i) {
+        if (triggered) {
+          return;
+        }
+
+        var chosen = sd;
+        var nextChosen = sortedDates[i + 1];
+
+        var duration = _moment["default"].duration((0, _moment["default"])(nextChosen).diff((0, _moment["default"])(chosen)));
+
+        if (nextChosen && duration.asDays() > 1) {
+          triggered = true;
+          setNoticeTxt("Päevade vahel ei tohi olla tühja päeva.");
+          return reset();
+        }
+      });
+
+      if (triggered) {
+        return;
+      }
+    }
+
+    onSubmit({
+      selectedDates: selectedDates,
+      outterChosenStartTs: outterChosenStartTs,
+      outterChosenEndTs: outterChosenEndTs
+    });
+  }, [onSubmit, selectedDates, readOnly, outterChosenEndTs, outterChosenStartTs, chooseMulti, chooseMulti]);
   (0, _react.useEffect)(function () {
     if (open) {
       dispatch({
@@ -164,6 +320,7 @@ var DatePicker = function DatePicker(_ref) {
   }, _react["default"].createElement(_Calendar["default"], {
     selectedDates: selectedDates,
     disabledDates: disabledDates,
+    disabledDatesTitle: disabledDatesTitle,
     onSelect: onSelect,
     onRemoveAtIndex: onRemoveAtIndex,
     minDate: minDate,
@@ -171,9 +328,15 @@ var DatePicker = function DatePicker(_ref) {
     onCancel: handleCancel,
     onOk: handleOk,
     readOnly: readOnly,
+    disableClock: disableClock,
     cancelButtonText: cancelButtonText,
     submitButtonText: submitButtonText,
-    selectedDatesTitle: selectedDatesTitle
+    selectedDatesTitle: selectedDatesTitle,
+    times: timesInternal,
+    noticeTxt: noticeTxt,
+    selectedStartTs: selectedStartTs,
+    selectedEndTs: selectedEndTs,
+    setOuterStartEndTs: setOuterStartEndTs
   }));
 };
 
@@ -185,7 +348,14 @@ DatePicker.propTypes = {
   selectedDates: _propTypes["default"].array,
   cancelButtonText: _propTypes["default"].string,
   submitButtonText: _propTypes["default"].string,
-  selectedDatesTitle: _propTypes["default"].string
+  selectedDatesTitle: _propTypes["default"].string,
+  disabledDatesTitle: _propTypes["default"].string,
+  disableClock: _propTypes["default"].string,
+  halfDisabledDates: _propTypes["default"].array,
+  times: _propTypes["default"].array,
+  chooseMulti: _propTypes["default"].bool,
+  selectedStartTs: _propTypes["default"].string,
+  selectedEndTs: _propTypes["default"].string
 };
 var _default = DatePicker;
 exports["default"] = _default;
